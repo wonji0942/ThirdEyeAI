@@ -93,7 +93,7 @@ class MainActivity : AppCompatActivity() {
             .build()
 
         val request = Request.Builder()
-            .url("http://172.30.1.25:5000/analyze-image")
+            .url("http://172.30.1.25:6000/analyze-image")
             .post(requestBody)
             .build()
 
@@ -104,9 +104,15 @@ class MainActivity : AppCompatActivity() {
 
             override fun onResponse(call: Call, response: Response) {
                 val result = response.body?.string()
-                val ttsText = JSONObject(result ?: "{}").optString("tts_text", "")
-                speakText(ttsText)
+
+                val rawText = JSONObject(result ?: "{}").optString("tts_text", "")
+                val cleanText = rawText
+                    .replace(Regex("[\\*\\_\\~\\`]+"), "") // 마크다운 기호 제거
+                    .replace(Regex("[\\[\\]\\(\\)]"), "") // 괄호, 링크 제거
+
+                speakText(cleanText)
             }
+
         })
     }
 
