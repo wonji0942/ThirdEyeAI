@@ -1,5 +1,7 @@
 # ThirdEyeAI
 
+# 깃허브 협업 관련 주의 사항(06.04 수정)
+
 # 데이터 전처리 과정 및 데이터 업로드 방식
 로보플로에서 라벨링 작업 수행
 roboflow API를 이용해 코랩에서 데이터셋 업로드해서 YOLOv8 모델 학습시킴.
@@ -15,4 +17,6 @@ https://drive.google.com/drive/u/0/folders/1GNMjEyf6C05ZU5AT6XG_YVqMGQVfBGed
 
 -로컬의 ThirdEyeAI 폴더 내에 .ipynb 파일 위치시키고, 깃허브에 업로드
 
-(개인 브랜치에서 colab_public 브랜치로 push해주기, PR메시지에 학습 결과 그래프 캡쳐해서 넣어주기)
+-개인 브랜치(예:dev_yhy)에 push -> 깃헙 사이트에 와서 개인브랜치에서 colab 브랜치로 PR 날리고 담당자에게 merge 요청하기
+(commit 메시지에 학습 결과 그래프 캡쳐해서 넣기)
+
