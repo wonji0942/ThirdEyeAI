@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 7
+names: ['membership', 'next', 'option_confirm', 'pay', 'payment_method', 'receipt', 'start']
+
+roboflow:
+  workspace: kiosk-nmotv
+  project: osp-bao99
+  version: 4
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/kiosk-nmotv/osp-bao99/dataset/4
