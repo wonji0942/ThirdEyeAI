@@ -26,7 +26,11 @@ service_name = "ThirdEyeKiosk._http._tcp.local."
 info = ServiceInfo(
     "_http._tcp.local.",                      # 서비스 타입
     service_name,                               # 서비스 이름
+<<<<<<< HEAD
     addresses=[socket.inet_aton("192.168.45.87")],  # 실제 서버 IP
+=======
+    addresses=[socket.inet_aton("192.168.1.99")],  # 실제 서버 IP
+>>>>>>> main
     port=6000,                                   # Flask 포트
     properties={"path": "/analyze-image"},
     server="thirdeyekiosk.local."
