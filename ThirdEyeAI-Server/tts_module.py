@@ -16,6 +16,10 @@ def speak(position=None, label=None, text=None):
     engine.runAndWait()
 
 
+def build_ment(position: str, label: str) -> str:
+    return f"'{label}' 버튼은 {position}에 있습니다."
+
+
 # 감지된 라벨 리스트로 화면 종류 유추
 def determine_screen_type(labels: list) -> str:
     if "pay" in labels:

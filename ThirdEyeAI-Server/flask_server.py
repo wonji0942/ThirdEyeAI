@@ -1,16 +1,14 @@
-# server.py
-# ────────────────────────────────────────────────────────────────
-# • 스마트 키오스크 화면을 촬영한 이미지를 받아 YOLO(best.pt)로 UI 요소 탐지
-# • tts_module의 로직을 이용해 안내 멘트(TTS용 문자열) 생성
-# • Android 앱은 /analyze-image POST → {"tts_text": "..."} JSON 수신
-# ────────────────────────────────────────────────────────────────
-
 from flask import Flask, request, jsonify
 from ultralytics import YOLO
 import cv2
 import numpy as np
 
-# tts_module: ① 멘트 생성 util, ② 라벨‧화면 판별 로직
+# mDNS 서비스 광고를 위한 zeroconf
+from zeroconf import Zeroconf, ServiceInfo
+import socket
+import atexit
+
+# tts_module: 멘트 생성 및 라벨/화면 판별 로직
 from tts_module import (
     build_ment,
     determine_screen_type,
@@ -18,33 +16,51 @@ from tts_module import (
     screen_messages,
 )
 
-# ────────────────────────────────────────────────────────────────
-# 1) Flask 인스턴스 & YOLO 모델 (애플리케이션 시작 시 1회 로드)
-# ────────────────────────────────────────────────────────────────
+# Flask 인스턴스
 app = Flask(__name__)
-model = YOLO("best.pt")  # 학습 완료된 모델 경로
 
 # ────────────────────────────────────────────────────────────────
-# 2) 위치(상·중·하 / 좌·중·우) 계산 함수 – main.py와 동일
+# mDNS 서비스 등록 (zeroconf)
+zeroconf = Zeroconf()
+service_name = "ThirdEyeKiosk._http._tcp.local."
+info = ServiceInfo(
+    "_http._tcp.local.",                      # 서비스 타입
+    service_name,                               # 서비스 이름
+    addresses=[socket.inet_aton("192.168.1.99")],  # 실제 서버 IP
+    port=6000,                                   # Flask 포트
+    properties={"path": "/analyze-image"},
+    server="thirdeyekiosk.local."
+)
+zeroconf.register_service(info)
+print(f"[mDNS] Registered service: {service_name}")
+
+# 애플리케이션 종료 시 mDNS 서비스 해제
+def cleanup_mdns():
+    zeroconf.unregister_service(info)
+    zeroconf.close()
+    print("[mDNS] Unregistered service")
+
+atexit.register(cleanup_mdns)
 # ────────────────────────────────────────────────────────────────
+
+# YOLO 모델 로드 (애플리케이션 시작 시 1회)
+model = YOLO("best.pt")  # 학습 완료된 weight 파일 경로
+
+# 위치(상·중·하 / 좌·중·우) 계산 함수
 def get_position_label(cx: float, cy: float, w: int, h: int) -> str:
-    """바운딩 박스 중심 좌표(cx, cy)를 ‘상단 좌측’ 형식의 구간 라벨로 변환"""
     x_ratio, y_ratio = cx / w, cy / h
-
     vertical = "상단" if y_ratio < 0.33 else ("중앙" if y_ratio < 0.66 else "하단")
     horizontal = "좌측" if x_ratio < 0.33 else ("중앙" if x_ratio < 0.66 else "우측")
     return f"{vertical} {horizontal}"
 
-# ────────────────────────────────────────────────────────────────
-# 3) /analyze-image 엔드포인트
-# ────────────────────────────────────────────────────────────────
+# /analyze-image 엔드포인트
 @app.route("/analyze-image", methods=["POST"])
 def analyze_image() -> tuple:
-    """
-    클라이언트(안드로이드)가 전송한 JPEG 이미지를 분석하고
-    버튼 위치 + 화면 기본 안내를 합친 멘트를 반환한다.
-    """
-    # 3-1) 파일 읽기 → numpy 배열 변환
+    # 1) 파일 존재 확인
+    if "image" not in request.files:
+        return jsonify({"error": "이미지 파일 파라미터가 없습니다."}), 400
+
+    # 2) 이미지 읽기 및 디코딩
     img_bytes = request.files["image"].read()
     img_np = np.frombuffer(img_bytes, np.uint8)
     image = cv2.imdecode(img_np, cv2.IMREAD_COLOR)
@@ -53,18 +69,18 @@ def analyze_image() -> tuple:
 
     h, w = image.shape[:2]
 
-    # 3-2) YOLO 추론
+    # 3) YOLO 추론
     results = model(image)
 
     detected_labels = []
-    detailed_lines = []  # 버튼별 안내 문장 리스트
+    detailed_lines = []  # 버튼별 안내문 리스트
 
     for res in results:
         for box in res.boxes:
             cls_name = model.names[int(box.cls[0])]
             detected_labels.append(cls_name)
 
-            # 위치 좌표 계산
+            # 박스 중심 좌표 계산
             x1, y1, x2, y2 = box.xyxy[0].tolist()
             cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
             pos_label = get_position_label(cx, cy, w, h)
@@ -73,20 +89,15 @@ def analyze_image() -> tuple:
             ko_label = translate_label(cls_name)
             detailed_lines.append(build_ment(position=pos_label, label=ko_label))
 
-    # 3-3) 화면 타입 추론 → 기본 멘트
+    # 4) 화면 타입 추론 → 기본 멘트
     screen_type = determine_screen_type(detected_labels)
     base_ment = screen_messages.get(screen_type, "화면을 확인해주세요.")
 
-    # 3-4) 최종 TTS 텍스트(한 줄) 구성
-    #     기본 멘트 + 버튼별 멘트를 공백으로 이어 붙임
+    # 5) 최종 TTS 텍스트 구성
     tts_text = " ".join([base_ment, *detailed_lines]).strip()
-
-    # 3-5) JSON 응답
     return jsonify({"tts_text": tts_text})
 
-# ────────────────────────────────────────────────────────────────
-# 4) 애플리케이션 진입점
-# ────────────────────────────────────────────────────────────────
+# 애플리케이션 진입점
 if __name__ == "__main__":
-    # 0.0.0.0:6000 → Android 단말기에서 동일 Wi-Fi IP로 접근
     app.run(host="0.0.0.0", port=6000)
+
