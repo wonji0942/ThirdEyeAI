@@ -1,68 +1,92 @@
+# server.py
+# ────────────────────────────────────────────────────────────────
+# • 스마트 키오스크 화면을 촬영한 이미지를 받아 YOLO(best.pt)로 UI 요소 탐지
+# • tts_module의 로직을 이용해 안내 멘트(TTS용 문자열) 생성
+# • Android 앱은 /analyze-image POST → {"tts_text": "..."} JSON 수신
+# ────────────────────────────────────────────────────────────────
+
 from flask import Flask, request, jsonify
-import openai
-import base64
+from ultralytics import YOLO
+import cv2
+import numpy as np
 
+# tts_module: ① 멘트 생성 util, ② 라벨‧화면 판별 로직
+from tts_module import (
+    build_ment,
+    determine_screen_type,
+    translate_label,
+    screen_messages,
+)
 
-openai.api_key = ""
+# ────────────────────────────────────────────────────────────────
+# 1) Flask 인스턴스 & YOLO 모델 (애플리케이션 시작 시 1회 로드)
+# ────────────────────────────────────────────────────────────────
 app = Flask(__name__)
+model = YOLO("best.pt")  # 학습 완료된 모델 경로
 
+# ────────────────────────────────────────────────────────────────
+# 2) 위치(상·중·하 / 좌·중·우) 계산 함수 – main.py와 동일
+# ────────────────────────────────────────────────────────────────
+def get_position_label(cx: float, cy: float, w: int, h: int) -> str:
+    """바운딩 박스 중심 좌표(cx, cy)를 ‘상단 좌측’ 형식의 구간 라벨로 변환"""
+    x_ratio, y_ratio = cx / w, cy / h
+
+    vertical = "상단" if y_ratio < 0.33 else ("중앙" if y_ratio < 0.66 else "하단")
+    horizontal = "좌측" if x_ratio < 0.33 else ("중앙" if x_ratio < 0.66 else "우측")
+    return f"{vertical} {horizontal}"
+
+# ────────────────────────────────────────────────────────────────
+# 3) /analyze-image 엔드포인트
+# ────────────────────────────────────────────────────────────────
 @app.route("/analyze-image", methods=["POST"])
-def analyze_image():
-    image = request.files["image"]
-    image_bytes = image.read()
-    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+def analyze_image() -> tuple:
+    """
+    클라이언트(안드로이드)가 전송한 JPEG 이미지를 분석하고
+    버튼 위치 + 화면 기본 안내를 합친 멘트를 반환한다.
+    """
+    # 3-1) 파일 읽기 → numpy 배열 변환
+    img_bytes = request.files["image"].read()
+    img_np = np.frombuffer(img_bytes, np.uint8)
+    image = cv2.imdecode(img_np, cv2.IMREAD_COLOR)
+    if image is None:
+        return jsonify({"error": "이미지를 디코딩할 수 없습니다."}), 400
 
-    vision_prompt = (
-        "다음 이미지는 카페 키오스크의 화면입니다.\n"
-        "이 화면의 주요 구성 요소(예: 메뉴 이름, 버튼, 안내 문구 등)를 텍스트 내용, 기능, 위치 정보와 함께 설명해 주세요.\n"
-        "특히, 사용자가 눌러야 할 주요 버튼(예: 매장, 포장, 구매, 결제 등)이 어디에 있는지를 명확히 구분해 주세요.\n"
-        "‘상품 준비중’처럼 선택이 불가능한 항목이 있다면 그것도 알려 주세요.\n"
-        "광고, 이벤트, 앱 설치 안내 등은 중요도가 낮으면 간략히만 언급하거나 생략해도 됩니다.\n"
-        "화면에 보이는 텍스트는 가능한 정확히 그대로 적어 주세요.\n"
-    )
+    h, w = image.shape[:2]
 
-    vision_response = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "user", "content": [
-                {"type": "text", "text": vision_prompt},
-                {"type": "image_url", "image_url": {
-                    "url": f"data:image/jpeg;base64,{image_b64}"
-                }},
-            ]},
-        ],
-        max_tokens=1000,
-    )
+    # 3-2) YOLO 추론
+    results = model(image)
 
-    parsed_result = vision_response.choices[0].message.content
+    detected_labels = []
+    detailed_lines = []  # 버튼별 안내 문장 리스트
 
-    final_prompt = (
-          "당신은 무인 카페 키오스크의 첫 화면을 안내하는 음성 문장을 만들어야 합니다.\n"
-          "화면 하단에는 회색 '매장' 버튼과 빨간색 '포장' 버튼이 있으며, 이 둘 중 하나를 선택하는 화면입니다.\n"
-          "고령자나 시각장애인이 듣고 바로 이해할 수 있도록 간단하고 명확하게 안내해야 합니다.\n\n"
-          "다음 조건을 반드시 지키세요:\n"
-          "- 간단한 인사를 포함하세요. 예: '안녕하세요.'\n"
-          "- 그 다음 문장에서 매장에서 드시려면 왼쪽 하단의 회색 매장 버튼을 누르라고 안내하세요.\n"
-          "- 그 다음 문장에서 포장하려면 오른쪽 하단의 빨간색 포장 버튼을 누르라고 안내하세요.\n"
-          "- 마지막 문장에서 '다음 화면에서 메뉴를 선택하게 됩니다.'라고 알려 주세요.\n"
-          "- 위 4문장 외에는 어떤 설명도 하지 마세요.\n"
-          "- '오늘 픽업', '예약', '앱', '언어', '국기', '확인 버튼', '주문 완료' 등 어떤 광고나 부가 기능도 절대로 언급하지 마세요.\n"
-          "- 숫자 나열(예: 1. 2. 3.)이나 목록 기호(*, → 등)도 절대 사용하지 마세요.\n"
-          "- 이 네 문장을 따뜻하고 또박또박한 말투로 구성해 주세요.\n\n"
-          f"화면 설명:\n{parsed_result}"
-     )
+    for res in results:
+        for box in res.boxes:
+            cls_name = model.names[int(box.cls[0])]
+            detected_labels.append(cls_name)
 
-    gpt_response = openai.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "user", "content": final_prompt}
-        ],
-        max_tokens=800,
-    )
+            # 위치 좌표 계산
+            x1, y1, x2, y2 = box.xyxy[0].tolist()
+            cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+            pos_label = get_position_label(cx, cy, w, h)
 
-    tts_text = gpt_response.choices[0].message.content
+            # 한글 라벨 변환 후 멘트 생성
+            ko_label = translate_label(cls_name)
+            detailed_lines.append(build_ment(position=pos_label, label=ko_label))
+
+    # 3-3) 화면 타입 추론 → 기본 멘트
+    screen_type = determine_screen_type(detected_labels)
+    base_ment = screen_messages.get(screen_type, "화면을 확인해주세요.")
+
+    # 3-4) 최종 TTS 텍스트(한 줄) 구성
+    #     기본 멘트 + 버튼별 멘트를 공백으로 이어 붙임
+    tts_text = " ".join([base_ment, *detailed_lines]).strip()
+
+    # 3-5) JSON 응답
     return jsonify({"tts_text": tts_text})
 
+# ────────────────────────────────────────────────────────────────
+# 4) 애플리케이션 진입점
+# ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    # 0.0.0.0:6000 → Android 단말기에서 동일 Wi-Fi IP로 접근
     app.run(host="0.0.0.0", port=6000)
-
