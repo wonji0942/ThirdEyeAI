@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.softeye.myapplication.app-mergeDebugResources-36:/values-h720dp-v13/values-h720dp-v13.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\wonji\\.gradle\\caches\\8.11.1\\transforms\\16c070ec0970c911de68033cc0115703\\transformed\\appcompat-1.7.0\\res\\values-h720dp-v13\\values-h720dp-v13.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "66",
+                        "endOffsets": "117"
+                    }
+                }
+            ]
+        }
+    ]
+}

@@ -82,6 +82,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.captureButton).setOnClickListener {
             if (serverHost == null) {
                 Toast.makeText(this, "서버를 아직 찾지 못했습니다.", Toast.LENGTH_SHORT).show()
+                Log.d("테스트", "버튼 클릭됨")
             } else {
                 takePictureAndSend()
             }
@@ -200,8 +201,10 @@ class MainActivity : AppCompatActivity() {
                     .post(requestBody)
                     .build()
 
-                val response = withContext(Dispatchers.IO) { client.newCall(request).execute() }
-                val result = response.body?.string() ?: "{}"
+                val result = withContext(Dispatchers.IO) {
+                    client.newCall(request).execute().body?.string() ?: "{}"
+                }
+
 
                 val rawText = JSONObject(result).optString("tts_text", "")
                 val cleanText = rawText
@@ -211,7 +214,7 @@ class MainActivity : AppCompatActivity() {
                 speakText(cleanText.ifEmpty { "결과를 가져오지 못했습니다." })
             } catch (e: IOException) {
                 Log.e("Server", "전송 실패", e)
-                speakText("서버 전송에 실패했습니다.")
+                speakText("서버 전송에 실패했습니다.")jiu
             }
         }
     }
