@@ -1,0 +1,10 @@
+# Python 3.10 권장 (Anaconda 가상환경에서 사용)
+
+# YOLO 추론용
+ultralytics>=8.1.0
+torch>=2.0.0
+opencv-python>=4.7.0
+matplotlib>=3.5.0
+
+# TTS (음성 안내용)
+pyttsx3>=2.90
