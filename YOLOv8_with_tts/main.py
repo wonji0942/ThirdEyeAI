@@ -15,25 +15,47 @@ def get_position_label(center_x, center_y, img_width, img_height):
     x_ratio = center_x / img_width
     y_ratio = center_y / img_height
 
-    position = ""
 
-    # 위/중/아래
-    if y_ratio < 0.33:
-        position += "상단"
-    elif y_ratio < 0.66:
-        position += "중앙"
-    else:
-        position += "하단"
+    
+
+    # # 위/중/아래
+    # if y_ratio < 0.33:
+    #     position += "상단"
+    # elif y_ratio > 0.66:
+    #     position += "하단"
 
     # 좌/중/우
-    if x_ratio < 0.33:
-        position += " 좌측"
-    elif x_ratio < 0.66:
-        position += " 중앙"
+    # if x_ratio < 0.33:
+    #     position += " 좌측"
+    # elif x_ratio > 0.66:
+    #     position += " 우측"
+    # elif 0.33 <= x_ratio <= 0.66 and 0.33 <= y_ratio <= 0.66:
+    #     position += " 중앙"
+    
+    if y_ratio < 0.33 and x_ratio < 0.33:
+        position = "상단 좌측"
+    elif y_ratio < 0.33 and x_ratio > 0.66:
+        position = "상단 우측"
+    elif y_ratio > 0.66 and x_ratio < 0.33:
+        position = "하단 좌측"  
+    elif y_ratio > 0.66 and x_ratio > 0.66:
+        position = "하단 우측"
+    elif y_ratio < 0.33 and 0.33 <= x_ratio <= 0.66:
+        position = "상단 중앙"
+    elif y_ratio > 0.66 and 0.33 <= x_ratio <= 0.66:
+        position = "하단 중앙"
+    elif 0.33 <= y_ratio <= 0.66 and x_ratio < 0.33:
+        position = "중앙 좌측"
+    elif 0.33 <= y_ratio <= 0.66 and x_ratio > 0.66:
+        position = "중앙 우측"
     else:
-        position += " 우측"
+        position = "중앙"
+    
+    
+    return position
 
-    return position.strip()
+# 이전 화면 타입 저장용 전역 변수
+last_screen_type = None
 
 # 모델 불러오기 및 추론
 model = YOLO("best.pt")
@@ -55,8 +77,27 @@ for r in results:
 # 화면 분류 및 출력
 screen_type = determine_screen_type(detected_labels)
 print(f"[화면 타입] {screen_type}")
-ment_screen = screen_messages[screen_type]
-speak(text=ment_screen)
+
+# ✅ 화면이 바뀐 경우에만 멘트 출력
+if screen_type != last_screen_type:
+    ment_screen = screen_messages.get(screen_type)
+    if ment_screen:
+        speak(text=ment_screen)
+
+        # 첫 번째 박스를 대표로 사용하여 위치 출력
+        if results and results[0].boxes:
+            box = results[0].boxes[0]
+            x1, y1, x2, y2 = box.xyxy[0].tolist()
+            center_x = (x1 + x2) / 2
+            center_y = (y1 + y2) / 2
+            label = model.names[int(box.cls[0])]
+            position = get_position_label(center_x, center_y, img_width, img_height)
+
+            speak(position=position, label=translate_label(label))
+
+        last_screen_type = screen_type
+# ment_screen = screen_messages[screen_type]
+# speak(text=ment_screen)
 
 
 
@@ -69,5 +110,5 @@ for r in results:
         label = model.names[int(box.cls[0])]
         position = get_position_label(center_x, center_y, img_width, img_height)
 
-        # position, label만 넘겨서 tts.py에서 안내 멘트 실행
-        speak(position=position, label=translate_label(label))
+        # # position, label만 넘겨서 tts.py에서 안내 멘트 실행
+        # speak(position=position, label=translate_label(label))
