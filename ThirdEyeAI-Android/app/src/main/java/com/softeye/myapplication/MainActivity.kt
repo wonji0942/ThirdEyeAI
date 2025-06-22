@@ -82,11 +82,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.captureButton).setOnClickListener {
             if (serverHost == null) {
                 Toast.makeText(this, "서버를 아직 찾지 못했습니다.", Toast.LENGTH_SHORT).show()
-<<<<<<< HEAD
-                Log.d("테스트", "버튼 클릭됨")
-=======
->>>>>>> main
+                Log.d("버튼 클릭", "서버 없음. host=null")
             } else {
+                Log.d("버튼 클릭", "서버 주소: $serverHost:$serverPort")
                 takePictureAndSend()
             }
         }
@@ -97,41 +95,42 @@ class MainActivity : AppCompatActivity() {
 
         discoveryListener = object : NsdManager.DiscoveryListener {
             override fun onDiscoveryStarted(regType: String) {
-                Log.d("NSD", "Discovery started: $regType")
+                Log.d("NSD", "서비스 검색 시작: $regType")
             }
 
             override fun onServiceFound(service: NsdServiceInfo) {
-                if (service.serviceType == "_http._tcp." &&
-                    service.serviceName == "ThirdEyeKiosk"
-                ) {
+                if (service.serviceType == "_http._tcp." && service.serviceName == "ThirdEyeKiosk") {
+                    Log.d("NSD", "서비스 발견: ${service.serviceName}, ${service.serviceType}")
                     nsdManager.resolveService(service, object : NsdManager.ResolveListener {
                         override fun onServiceResolved(resolved: NsdServiceInfo) {
                             serverHost = resolved.host.hostAddress
                             serverPort = resolved.port
-                            Log.d("NSD", "Resolved: $serverHost:$serverPort")
+                            Log.d("NSD", "서버 주소 확인됨: $serverHost:$serverPort")
                         }
 
                         override fun onResolveFailed(srv: NsdServiceInfo, error: Int) {
-                            Log.e("NSD", "Resolve failed: $error")
+                            Log.e("NSD", "서비스 해석 실패: $error")
                         }
                     })
                 }
             }
 
-            override fun onServiceLost(service: NsdServiceInfo) {}
+            override fun onServiceLost(service: NsdServiceInfo) {
+                Log.w("NSD", "서비스 유실됨")
+            }
 
             override fun onStartDiscoveryFailed(type: String, code: Int) {
-                Log.e("NSD", "Start discovery failed: $code")
+                Log.e("NSD", "검색 시작 실패: $code")
                 nsdManager.stopServiceDiscovery(this)
             }
 
             override fun onStopDiscoveryFailed(type: String, code: Int) {
-                Log.e("NSD", "Stop discovery failed: $code")
+                Log.e("NSD", "검색 중지 실패: $code")
                 nsdManager.stopServiceDiscovery(this)
             }
 
             override fun onDiscoveryStopped(serviceType: String) {
-                Log.d("NSD", "Discovery stopped")
+                Log.d("NSD", "서비스 검색 중지됨")
             }
         }
 
@@ -188,6 +187,7 @@ class MainActivity : AppCompatActivity() {
     private fun uploadImageToServer(file: File) {
         val host = serverHost ?: return
         val url = "http://$host:$serverPort/analyze-image"
+        Log.d("서버 전송", "요청 URL: $url")
 
         lifecycleScope.launch {
             try {
@@ -204,17 +204,10 @@ class MainActivity : AppCompatActivity() {
                     .post(requestBody)
                     .build()
 
-<<<<<<< HEAD
                 val result = withContext(Dispatchers.IO) {
                     client.newCall(request).execute().body?.string() ?: "{}"
                 }
 
-
-=======
-                val response = withContext(Dispatchers.IO) { client.newCall(request).execute() }
-                val result = response.body?.string() ?: "{}"
-
->>>>>>> main
                 val rawText = JSONObject(result).optString("tts_text", "")
                 val cleanText = rawText
                     .replace(Regex("[\\*\\_\\~\\`]+"), "")
@@ -223,11 +216,7 @@ class MainActivity : AppCompatActivity() {
                 speakText(cleanText.ifEmpty { "결과를 가져오지 못했습니다." })
             } catch (e: IOException) {
                 Log.e("Server", "전송 실패", e)
-<<<<<<< HEAD
-                speakText("서버 전송에 실패했습니다.")jiu
-=======
                 speakText("서버 전송에 실패했습니다.")
->>>>>>> main
             }
         }
     }
