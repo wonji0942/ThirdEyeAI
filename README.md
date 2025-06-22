@@ -56,8 +56,13 @@
 ## 📂 기능 시연
 
 시연 영상
+
+GitHub 내 비디오
 (https://github.com/wonji0942/ThirdEyeAI/blob/main/assets/시연.mp4)
 
+
+Google Drive 비디오
+(https://drive.google.com/file/d/1sXgNTyVXXS7Z-VwNU_QP0a9hhOWDkhsn/view?usp=sharing)
 | 기능 | 설명 |
 |------|------|
 | 버튼 인식 | YOLOv8 모델로 버튼 위치와 라벨 검출 |
