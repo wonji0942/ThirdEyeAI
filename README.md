@@ -29,7 +29,7 @@
   `['membership', 'next', 'option_confirm', 'pay', 'payment_method', 'receipt', 'start']`
 
 * 총 이미지 수: 403장
-  → 직접 촬영한 원본 이미지 155장을 바탕으로 **증강 기법을 적용해 약 3배 확장**
+  → 직접 촬영한 원본 이미지 155장을 바탕으로 **증강 기법을 적용해 약 3배 규모로 확**
 
 * 라벨 포맷: YOLOv8 형식 (bounding box + class index)
 
@@ -108,12 +108,36 @@ python main.py
 
 ## 🧱 기술 스택
 
-- Python 3.10
-- YOLOv8 (Ultralytics)
-- Flask --> 확인요망!
-- OpenCV
-- pyttsx3 (오프라인 TTS)
-- GitHub (협업 및 버전 관리)
+### 📌 **백엔드 / 서버**
+
+* **Python 3.10**
+* **Flask** – YOLO 추론 API 서버 구현
+* **YOLOv8 (Ultralytics)** – 키오스크 버튼 객체 탐지
+* **OpenCV** – 이미지 전처리 및 디버깅
+* **pyttsx3** – 오프라인 TTS(음성 안내) 모듈
+* **Zeroconf (mDNS)** – 서버 자동 탐색 기능 구현
+
+### 📌 **프론트엔드 / Android**
+
+* **Kotlin** – Android 앱 개발 (CameraX, OkHttp, TextToSpeech)
+* **CameraX API** – 실시간 카메라 촬영 기능 구현
+* **OkHttp** – 이미지 전송을 위한 HTTP 통신
+* **TextToSpeech API** – 서버 응답 기반 음성 안내 출력
+* **NSDManager (Android mDNS)** – Zeroconf 기반 서버 자동 연결
+
+### 📌 **데이터 수집 / 모델 학습**
+
+* **Roboflow** – 데이터셋 관리, 증강 및 YOLO 포맷 변환
+* **Google Colab** – YOLOv8 모델 학습 및 테스트
+* **YOLO 포맷 (bounding box + class index)** – 라벨링 포맷
+* **이미지 증강 기법** – 회전, 밝기, 노출, 노이즈 등 자동화 적용
+
+### 📌 **협업 및 버전 관리**
+
+* **Git / GitHub** – 브랜치 기반 협업, PR, 코드 리뷰
+* **Markdown** – README 및 기술 문서 작성
+* **Google Drive** – 시연 영상 및 모델 파일 공유
+
 
 ---
 
@@ -181,14 +205,14 @@ python flask_server.py
 ```
 
 * 서버는 기본적으로 **6000번 포트**에서 실행되며,
-* Zeroconf를 통해 `ThirdEyeKiosk._http._tcp.local.` 이름으로 **mDNS 광고**가 시작됩니다.
+* Zeroconf를 통해 `ThirdEyeKiosk._http._tcp.local.` 이름으로 **mDNS 브로드캐스트**가 시작됩니다.
 * 터미널에서 `[mDNS] Registered service: ThirdEyeKiosk._http._tcp.local.` 로그가 보이면 정상 실행된 것입니다.
 
 2. Android 앱을 실행하면 앱이 자동으로 **mDNS를 통해 서버를 탐색**하고 연결을 시도합니다.
 
 3. 앱의 촬영 버튼을 누르면, 폰 카메라로 촬영된 키오스크 화면 이미지가 Flask 서버의 `/analyze-image` API로 전송됩니다.
 
-4. 서버는 YOLOv8 모델로 버튼을 감지하고, 감지된 버튼 라벨과 위치 정보를 바탕으로 **적절한 음성 안내 멘트 텍스트를 JSON 형태로 응답**합니다.
+4. 서버는 YOLOv8 모델로 버튼을 감지하고, 감지된 버튼 라벨과 위치 정보를 바탕으로 **적절한 음성 안내 멘트를 JSON 형태로 응답**합니다.
 
 5. Android 앱은 해당 멘트를 수신하고, **TextToSpeech API를 통해 실시간으로 음성 안내를 출력**합니다.
 
